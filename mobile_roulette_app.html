@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>スマホ特化ルーレット抽選</title>
+  <style>
+    body {
+      margin: 0; 
+      padding: 1rem;
+      text-align: center;
+      font-family: sans-serif;
+      background: #fff;
+    }
+    h2 {
+      margin-top: 0.2rem; /* ページ上部に近づける */
+    }
+    .roulette-container {
+      position: relative;
+      width: 90vw;
+      max-width: 400px;
+      margin: 1rem auto;
+    }
+    /* ポインター：中央に配置し、180度回転で下向きに（下向きの矢印） */
+    .pointer {
+      position: absolute;
+      top: -25px; 
+      left: 50%;
+      transform: translateX(-50%) rotate(180deg);
+      width: 0;
+      height: 0;
+      border-left: 15px solid transparent;
+      border-right: 15px solid transparent;
+      border-bottom: 30px solid red;
+      z-index: 10;
+    }
+    canvas {
+      width: 100%;
+      height: auto;
+      border-radius: 50%;
+      background: #fafafa;
+    }
+    button {
+      margin-top: 1rem;
+      padding: 0.8rem 2rem;
+      font-size: 1.1rem;
+      background: #2196F3;
+      color: white;
+      border: none;
+      border-radius: 2rem;
+      cursor: pointer;
+    }
+    button:hover {
+      background: #1976D2;
+    }
+    #result {
+      margin-top: 1rem;
+      font-size: 1.4rem;
+      font-weight: bold;
+    }
+    /* 大当たりアニメーション */
+    @keyframes winAnimation {
+      0% { transform: scale(0.5); opacity: 0; }
+      50% { transform: scale(2.0); opacity: 1; }
+      100% { transform: scale(1); opacity: 1; }
+    }
+    .win-animation {
+      animation: winAnimation 2s ease-out;
+    }
+    /* ハズレアニメーション */
+    @keyframes loseAnimation {
+      0% { transform: scale(0.5); opacity: 0; }
+      50% { transform: scale(2.5); opacity: 1; }
+      100% { transform: scale(1); opacity: 1; }
+    }
+    .lose-animation {
+      animation: loseAnimation 2s ease-out;
+    }
+  </style>
+</head>
+<body>
+  <h2>ルーレットを回そう！</h2>
+  <div class="roulette-container">
+    <div class="pointer"></div>
+    <canvas id="wheel" width="400" height="400"></canvas>
+  </div>
+  <button onclick="spin()">ルーレットをスタート！</button>
+  <div id="result">結果：？</div>
+
+  <script>
+    // ラベルを指定の名前に変更（修正済み）
+    const labels = ["菊ちゃん", "河ニキ", "廣ニイ", "金子っち", "都倉マル"];
+    const colors = ["#FF6B6B", "#FFD93D", "#6BCB77", "#4D96FF", "#B37CC0"];
+    const canvas = document.getElementById("wheel");
+    const ctx = canvas.getContext("2d");
+    const size = canvas.width;
+    const radius = size / 2;
+    let currentAngle = 0;
+
+    // ルーレット描画関数（基本コードそのまま）
+    function drawWheel(angle = 0) {
+      ctx.clearRect(0, 0, size, size);
+      ctx.save();
+      ctx.translate(radius, radius);
+      ctx.rotate(angle);
+      const segCount = labels.length;
+      const arc = 2 * Math.PI / segCount;
+      for (let i = 0; i < segCount; i++) {
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.arc(0, 0, radius, i * arc, (i + 1) * arc);
+        ctx.fillStyle = colors[i];
+        ctx.fill();
+        ctx.strokeStyle = "#fff";
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        ctx.save();
+        ctx.rotate(i * arc + arc / 2);
+        ctx.textAlign = "right";
+        ctx.fillStyle = "#000";
+        ctx.font = "bold 18px sans-serif";
+        ctx.fillText(labels[i], radius - 10, 8);
+        ctx.restore();
+      }
+      ctx.restore();
+    }
+
+    drawWheel(currentAngle);
+
+    // ルーレットを回す関数
+    function spin() {
+      const fullSpins = 5;
+      const index = Math.floor(Math.random() * labels.length);
+      const arcDeg = 360 / labels.length; // 72°
+      const segmentCenter = index * arcDeg + arcDeg / 2;
+      // Canvas上で上部を結果表示位置（12時方向＝270°）
+      let desiredRotation = 270 - segmentCenter;
+      desiredRotation = ((desiredRotation % 360) + 360) % 360;
+      const totalRotationDeg = fullSpins * 360 + desiredRotation;
+      const duration = 4000;
+      const start = performance.now();
+
+      function animate(now) {
+        const elapsed = now - start;
+        const progress = Math.min(elapsed / duration, 1);
+        const easeOut = 1 - Math.pow(1 - progress, 4);
+        const currentRotationDeg = easeOut * totalRotationDeg;
+        currentAngle = currentRotationDeg * Math.PI / 180;
+        drawWheel(currentAngle);
+        if (progress < 1) {
+          requestAnimationFrame(animate);
+        } else {
+          const resultEl = document.getElementById("result");
+          // スピン終了直後の結果表示
+          resultEl.textContent = "結果：" + labels[index];
+          // 2秒後にアニメーションで差し替え
+          setTimeout(() => {
+            resultEl.classList.remove("win-animation", "lose-animation");
+            void resultEl.offsetWidth; // 強制リフロー
+            if (labels[index] === "菊ちゃん") {
+              resultEl.textContent = "大当たり～！";
+              resultEl.classList.add("win-animation");
+              // アニメーション後に指定のURLへ遷移（4秒後）
+              setTimeout(() => {
+                window.location.href = "https://markezine.jp/article/detail/27407";
+              }, 4000);
+            } else {
+              resultEl.textContent = "ハズレ～";
+              resultEl.classList.add("lose-animation");
+            }
+          }, 2000);
+        }
+      }
+      requestAnimationFrame(animate);
+    }
+  </script>
+</body>
+</html>
